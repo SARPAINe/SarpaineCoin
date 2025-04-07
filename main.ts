@@ -4,23 +4,31 @@ const sha256Hash = (data: string): string => {
     return crypto.createHash("sha256").update(data).digest("hex");
 };
 
+class Transaction {
+    fromAddress: string;
+    toAddress: string;
+    amount: number;
+    constructor(fromAddress: string, toAddress: string, amount: number) {
+        this.fromAddress = fromAddress;
+        this.toAddress = toAddress;
+        this.amount = amount;
+    }
+}
+
 class Block {
-    index: number;
     timestamp: string;
-    data: any;
+    transactions: any;
     previousHash: string;
     hash: string;
     nonce: number;
 
     constructor(
-        index: number,
         timestamp: string,
-        data: any,
+        transactions: any,
         previousHash: string = ""
     ) {
-        this.index = index;
         this.timestamp = timestamp;
-        this.data = data;
+        this.transactions = transactions;
         this.previousHash = previousHash;
         this.hash = this.calculateHash();
         this.nonce = 0;
@@ -28,10 +36,9 @@ class Block {
 
     calculateHash(): string {
         return sha256Hash(
-            this.index +
-                this.previousHash +
+            this.previousHash +
                 this.timestamp +
-                JSON.stringify(this.data) +
+                JSON.stringify(this.transactions) +
                 this.nonce
         ).toString();
     }
@@ -47,33 +54,75 @@ class Block {
         }
 
         this.hash = hash;
-        console.log(
-            `Block mined: ${hash} with nonce: ${this.nonce} at index: ${this.index}`
-        );
+        console.log(`Block mined: ${hash} with nonce: ${this.nonce}}`);
     }
 }
 
 class Blockchain {
     chain: Block[];
     difficulty: number;
+    pendingTransactions: Transaction[];
+    miningReward: number;
 
     constructor() {
         this.chain = [this.createGenesisBlock()];
         this.difficulty = 2; // Difficulty should be dynamic in a real-world scenario based on average block time
+        this.pendingTransactions = [];
+        this.miningReward = 100; // Reward for mining a block
     }
 
     createGenesisBlock(): Block {
-        return new Block(0, new Date().toISOString(), "Genesis Block", "0");
+        return new Block(new Date().toISOString(), "Genesis Block", "0");
     }
 
     getLatestBlock(): Block {
         return this.chain[this.chain.length - 1];
     }
 
-    addBlock(newBlock: Block): void {
-        newBlock.previousHash = this.getLatestBlock().hash;
-        newBlock.mineBlock(this.difficulty);
-        this.chain.push(newBlock);
+    // addBlock(newBlock: Block): void {
+    //     newBlock.previousHash = this.getLatestBlock().hash;
+    //     newBlock.mineBlock(this.difficulty);
+    //     this.chain.push(newBlock);
+    // }
+    minePendingTransactions(miningRewardAddress: string): void {
+        const block = new Block(
+            new Date().toISOString(),
+            this.pendingTransactions
+        );
+        block.previousHash = this.getLatestBlock().hash;
+        block.mineBlock(this.difficulty);
+
+        console.log("Block successfully mined!");
+        this.chain.push(block);
+
+        this.pendingTransactions = [
+            new Transaction(
+                "0x0000000000000000000000000000000000000000",
+                miningRewardAddress,
+                this.miningReward
+            ),
+        ];
+    }
+
+    createTransaction(transaction: Transaction): void {
+        this.pendingTransactions.push(transaction);
+    }
+
+    getBalanceOfAddress(address: string): number {
+        let balance = 0;
+
+        for (const block of this.chain) {
+            for (const transaction of block.transactions) {
+                if (transaction.fromAddress === address) {
+                    balance -= transaction.amount;
+                }
+                if (transaction.toAddress === address) {
+                    balance += transaction.amount;
+                }
+            }
+        }
+
+        return balance;
     }
 
     isChainValid(): boolean {
@@ -95,15 +144,20 @@ class Blockchain {
 
 // Example Usage
 const sarpaineCoin = new Blockchain();
-console.log("Mining block 1... with difficulty: ", sarpaineCoin.difficulty);
-sarpaineCoin.addBlock(new Block(1, new Date().toISOString(), { amount: 4 }));
-console.log("Mining block 2... with difficulty: ", sarpaineCoin.difficulty);
-sarpaineCoin.addBlock(new Block(2, new Date().toISOString(), { amount: 10 }));
 
-// Blockchain validation
-// console.log("Is blockchain valid? ", sarpaineCoin.isChainValid());
-// sarpaineCoin.chain[1].data = { amount: 100 };
-// sarpaineCoin.chain[1].hash = sarpaineCoin.chain[1].calculateHash();
-// console.log("Is blockchain valid? ", sarpaineCoin.isChainValid());
+sarpaineCoin.createTransaction(new Transaction("address1", "address2", 100));
+sarpaineCoin.createTransaction(new Transaction("address2", "address1", 50));
+
+console.log("Starting the miner...");
+sarpaineCoin.minePendingTransactions("shaharin@address");
+
+console.log("Starting the miner again...");
+sarpaineCoin.minePendingTransactions("shaharin@address");
+
+console.log(
+    `Balance of shaharin@address is ${sarpaineCoin.getBalanceOfAddress(
+        "shaharin@address"
+    )}`
+);
 
 console.log(JSON.stringify(sarpaineCoin, null, 1));
