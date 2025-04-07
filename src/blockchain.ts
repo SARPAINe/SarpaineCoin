@@ -1,21 +1,65 @@
 import * as crypto from "crypto";
+import { ec as EC, utils } from "elliptic";
+import { getPublicAddress } from "./utils";
+const ec = new EC("secp256k1");
 
 const sha256Hash = (data: string): string => {
     return crypto.createHash("sha256").update(data).digest("hex");
 };
 
-class Transaction {
+export class Transaction {
     fromAddress: string;
     toAddress: string;
     amount: number;
-    constructor(fromAddress: string, toAddress: string, amount: number) {
+    signature: string;
+    publicKey: string;
+    constructor(
+        fromAddress: string,
+        toAddress: string,
+        amount: number,
+        publicKey: string
+    ) {
         this.fromAddress = fromAddress;
         this.toAddress = toAddress;
         this.amount = amount;
+        this.publicKey = publicKey;
+        this.signature = "";
+    }
+
+    calculateHash(): string {
+        return sha256Hash(
+            this.fromAddress + this.toAddress + this.amount
+        ).toString();
+    }
+
+    signTransaction(signingKey: EC.KeyPair): void {
+        if (this.fromAddress === null) {
+            throw new Error("Transaction must be signed");
+        }
+
+        if (getPublicAddress(signingKey) !== this.fromAddress) {
+            throw new Error("You cannot sign transactions for other wallets");
+        }
+
+        const hashTx = this.calculateHash();
+        const sig = signingKey.sign(hashTx, "base64");
+        this.signature = sig.toDER("hex");
+    }
+
+    isValid() {
+        if (this.fromAddress === "0x0000000000000000000000000000000000000000")
+            return true;
+
+        if (!this.signature || this.signature.length === 0) {
+            throw new Error("No signature in this transaction");
+        }
+
+        const publicKey = ec.keyFromPublic(this.publicKey, "hex");
+        return publicKey.verify(this.calculateHash(), this.signature);
     }
 }
 
-class Block {
+export class Block {
     timestamp: string;
     transactions: any;
     previousHash: string;
@@ -56,9 +100,21 @@ class Block {
         this.hash = hash;
         console.log(`Block mined: ${hash} with nonce: ${this.nonce}}`);
     }
+
+    hasValidTransactions(): boolean {
+        for (const tx of this.transactions) {
+            if (!tx.isValid()) {
+                return false;
+            }
+        }
+        return true;
+    }
+    getTransactions(): Transaction[] {
+        return this.transactions;
+    }
 }
 
-class Blockchain {
+export class Blockchain {
     chain: Block[];
     difficulty: number;
     pendingTransactions: Transaction[];
@@ -84,7 +140,10 @@ class Blockchain {
     //     newBlock.mineBlock(this.difficulty);
     //     this.chain.push(newBlock);
     // }
-    minePendingTransactions(miningRewardAddress: string): void {
+    minePendingTransactions(
+        miningRewardAddress: string,
+        publicKey: string
+    ): void {
         const block = new Block(
             new Date().toISOString(),
             this.pendingTransactions
@@ -99,12 +158,20 @@ class Blockchain {
             new Transaction(
                 "0x0000000000000000000000000000000000000000",
                 miningRewardAddress,
-                this.miningReward
+                this.miningReward,
+                publicKey
             ),
         ];
     }
 
-    createTransaction(transaction: Transaction): void {
+    addTransaction(transaction: Transaction): void {
+        if (!transaction.fromAddress || !transaction.toAddress) {
+            throw new Error("Transaction must include from and to address");
+        }
+
+        if (transaction.isValid() === false) {
+            throw new Error("Cannot add invalid transaction to chain");
+        }
         this.pendingTransactions.push(transaction);
     }
 
@@ -130,6 +197,10 @@ class Blockchain {
             const currentBlock = this.chain[i];
             const previousBlock = this.chain[i - 1];
 
+            if (currentBlock.hasValidTransactions() === false) {
+                return false;
+            }
+
             if (currentBlock.hash !== currentBlock.calculateHash()) {
                 return false;
             }
@@ -141,23 +212,3 @@ class Blockchain {
         return true;
     }
 }
-
-// Example Usage
-const sarpaineCoin = new Blockchain();
-
-sarpaineCoin.createTransaction(new Transaction("address1", "address2", 100));
-sarpaineCoin.createTransaction(new Transaction("address2", "address1", 50));
-
-console.log("Starting the miner...");
-sarpaineCoin.minePendingTransactions("shaharin@address");
-
-console.log("Starting the miner again...");
-sarpaineCoin.minePendingTransactions("shaharin@address");
-
-console.log(
-    `Balance of shaharin@address is ${sarpaineCoin.getBalanceOfAddress(
-        "shaharin@address"
-    )}`
-);
-
-console.log(JSON.stringify(sarpaineCoin, null, 1));
