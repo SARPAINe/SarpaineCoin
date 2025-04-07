@@ -1,15 +1,25 @@
 {
-  "name": "sarpainecoin",
-  "version": "1.0.0",
-  "main": "main.ts",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "Shaharin Ahmed",
-  "license": "ISC",
-  "description": "",
-  "dependencies": {
-    "ts-node": "^10.9.2",
-    "typescript": "^5.8.3"
-  }
+    "name": "sarpainecoin",
+    "version": "1.0.0",
+    "description": "A simple blockchain implementation in TypeScript demonstrating basic concepts like hashing, mining, and validation.",
+    "main": "index.ts",
+    "scripts": {
+        "start": "ts-node main.ts",
+        "build": "tsc",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "author": "Shaharin Ahmed",
+    "license": "ISC",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/SARPAINe/SarpaineCoin"
+    },
+    "dependencies": {
+        "node-typescript": "^0.1.3",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.8.3"
+    },
+    "devDependencies": {
+        "@types/node": "^22.14.0"
+    }
 }
